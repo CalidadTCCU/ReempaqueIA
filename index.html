@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Calidad - Estándar Visual</title>
+    <title>Análisis de Calidad - Carga de Imagen</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -12,128 +12,183 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            background-color: #111;
+            background-color: #1a1a1a;
             overflow: hidden;
         }
-        #camera-section {
+
+        /* Sección Superior: Previsualización de la imagen cargada */
+        #image-section {
             flex: 1;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             background-color: #000;
             position: relative;
+            padding: 20px;
         }
-        #webcam-container canvas {
-            max-height: 85vh;
+
+        #image-preview {
+            max-height: 70vh;
             max-width: 100%;
-            border-radius: 12px;
-            transform: scaleX(-1); /* Efecto espejo para comodidad del operador */
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none; /* Oculto hasta que se cargue una imagen */
         }
+
+        /* Controles de carga flotantes */
+        #controls-container {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        /* Estilo para el botón visual de carga */
+        .custom-file-upload {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #0056b3;
+            transform: scale(1.02);
+        }
+
+        /* Ocultar el input file real que es feo */
+        #image-input {
+            display: none;
+        }
+
+        #loading-model-msg {
+            color: white;
+            font-size: 1.2rem;
+            position: absolute;
+        }
+
+        /* Sección Inferior: Panel Semáforo (Resultado) */
         #result-section {
-            height: 35vh;
+            height: 30vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             background-color: #333;
             color: white;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.3s ease;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
             z-index: 10;
+            padding: 10px;
+            text-align: center;
         }
+
         #status-text {
-            font-size: 3.2rem;
+            font-size: 2.8rem;
             font-weight: 900;
             text-transform: uppercase;
-            text-align: center;
             margin: 0;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
+
+        @media (max-width: 600px) {
+            #status-text { font-size: 1.8rem; }
+        }
+
         #percentage-text {
-            font-size: 1.4rem;
-            margin-top: 10px;
+            font-size: 1.2rem;
+            margin-top: 5px;
             opacity: 0.9;
-            font-weight: bold;
-        }
-        #start-btn {
-            position: absolute;
-            padding: 22px 45px;
-            font-size: 1.6rem;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            z-index: 20;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            transition: transform 0.2s;
-        }
-        #start-btn:hover {
-            transform: scale(1.05);
         }
     </style>
 </head>
 <body>
 
-    <div id="camera-section">
-        <button id="start-btn" type="button" onclick="init()">INICIAR EVALUACIÓN DE CALIDAD</button>
-        <div id="webcam-container"></div>
+    <div id="image-section">
+        <div id="loading-model-msg">Cargando modelo de IA...</div>
+        
+        <img id="image-preview" src="#" alt="Previsualización" />
+
+        <div id="controls-container" style="display: none;">
+            <input type="file" id="image-input" accept="image/*" onchange="readURL(this);" />
+            <label for="image-input" class="custom-file-upload">
+                📷 SELECCIONAR IMAGEN
+            </label>
+        </div>
     </div>
 
     <div id="result-section">
-        <p id="status-text">SISTEMA APAGADO</p>
-        <div id="percentage-text">Presione el botón azul para encender la cámara</div>
+        <p id="status-text">ESPERANDO IMAGEN</p>
+        <div id="percentage-text">Cargue una foto para analizar</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // Tu modelo enlazado directamente
+        // Tu modelo enlazado
         const URL = "https://teachablemachine.withgoogle.com/models/FRvbyoDob/";
 
-        let model, webcam, maxPredictions;
+        let model, maxPredictions;
+        const imagePreview = document.getElementById('image-preview');
+        const loadingMsg = document.getElementById('loading-model-msg');
+        const controlsCont = document.getElementById('controls-container');
 
-        // Inicializa el modelo y la cámara
-        async function init() {
-            document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('status-text').innerText = "CARGANDO MODELO IA...";
-
+        // 1. Cargar el modelo al abrir la página automáticamente
+        async function initModel() {
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
             try {
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
-
-                // Configuración de cámara optimizada para la pantalla
-                const flip = true; 
-                webcam = new tmImage.Webcam(500, 500, flip); 
-                await webcam.setup(); 
-                await webcam.play();
                 
-                document.getElementById("webcam-container").appendChild(webcam.canvas);
-                window.requestAnimationFrame(loop);
+                // Ocultar mensaje de carga y mostrar botones
+                loadingMsg.style.display = 'none';
+                controlsCont.style.display = 'flex';
             } catch (error) {
                 console.error(error);
-                alert("Error al acceder a la cámara. Asegúrate de dar los permisos correspondientes.");
-                document.getElementById('start-btn').style.display = 'block';
-                document.getElementById('status-text').innerText = "SISTEMA APAGADO";
+                loadingMsg.innerText = "Error cargando el modelo. Revisa la consola.";
+                loadingMsg.style.color = "red";
             }
         }
 
-        async function loop() {
-            webcam.update(); 
-            await predict();
-            window.requestAnimationFrame(loop);
+        // 2. Función para leer el archivo seleccionado y mostrarlo en pantalla
+        function readURL(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    // Establecer la imagen cargada como fuente de la previsualización
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    
+                    // Esperar un momento a que la imagen se renderice y luego predecir
+                    setTimeout(predict, 100); 
+                };
+
+                reader.readAsDataURL(input.files[0]);
+            }
         }
 
-        // Procesa la imagen y cambia la interfaz según el resultado más probable
+        // 3. Procesa la imagen estática cargada
         async function predict() {
-            const prediction = await model.predict(webcam.canvas);
+            if (!model) return;
+
+            document.getElementById("status-text").innerText = "ANALIZANDO...";
+            document.getElementById("result-section").style.backgroundColor = "#333";
+
+            // Teachable Machine puede predecir directamente desde un elemento <img>
+            const prediction = await model.predict(imagePreview);
             
-            // Algoritmo para encontrar qué categoría tiene el porcentaje más alto en tiempo real
+            // Encontrar la categoría más probable
             let claseGanadora = prediction[0];
             for (let i = 1; i < maxPredictions; i++) {
                 if (prediction[i].probability > claseGanadora.probability) {
@@ -144,35 +199,38 @@
             const nombreClase = claseGanadora.className.toLowerCase();
             const porcentaje = (claseGanadora.probability * 100).toFixed(0);
 
+            // Actualizar la interfaz (Misma lógica de semáforo)
             const panelSemafoto = document.getElementById("result-section");
             const textoEstatus = document.getElementById("status-text");
             const textoPorcentaje = document.getElementById("percentage-text");
 
-            textoPorcentaje.innerText = `Precisión del análisis: ${porcentaje}%`;
+            textoPorcentaje.innerText = `Confianza del análisis: ${porcentaje}%`;
 
-            // --- LÓGICA DEL SEMÁFORO VISUAL ---
             if (nombreClase.includes("critico") || nombreClase.includes("crítico")) {
                 panelSemafoto.style.backgroundColor = "#dc3545"; // Rojo
-                textoEstatus.innerText = "🚨 RECHAZO: DEFECTO CRÍTICO 🚨";
+                textoEstatus.innerText = "🚨 RECHAZO: CRÍTICO 🚨";
             } 
             else if (nombreClase.includes("mayor")) {
                 panelSemafoto.style.backgroundColor = "#ff9800"; // Naranja
-                textoEstatus.innerText = "⚠️ ALERTA: DEFECTO MAYOR";
+                textoEstatus.innerText = "⚠️ ALERTA: MAYOR";
             } 
             else if (nombreClase.includes("menor")) {
-                panelSemafoto.style.backgroundColor = "#17a2b8"; // Celeste / Cian
-                textoEstatus.innerText = "🔍 DETALLE: DEFECTO MENOR";
+                panelSemafoto.style.backgroundColor = "#17a2b8"; // Celeste
+                textoEstatus.innerText = "🔍 DETALLE: MENOR";
             } 
             else if (nombreClase.includes("sin defecto") || nombreClase.includes("cumple") || nombreClase.includes("bueno")) {
-                panelSemafoto.style.backgroundColor = "#28a745"; // Verde brillante
-                textoEstatus.innerText = "✅ PIEZA OK - CUMPLE ESTÁNDAR";
+                panelSemafoto.style.backgroundColor = "#28a745"; // Verde
+                textoEstatus.innerText = "✅ PIEZA OK";
             } 
             else {
-                // En caso de que se use otro nombre no registrado
                 panelSemafoto.style.backgroundColor = "#6c757d"; 
                 textoEstatus.innerText = claseGanadora.className.toUpperCase();
             }
         }
+
+        // Iniciar carga del modelo al cargar la ventana
+        window.onload = initModel;
+
     </script>
 </body>
 </html>
