@@ -11,11 +11,10 @@
             padding: 0;
             display: flex;
             flex-direction: column;
-            /* 4. SOLUCIÓN AL ZOOM: Se cambia a min-height y se activa la barra de desplazamiento */
             min-height: 100vh;
             height: auto;
-            background-color: #0e3d26; /* 1. Verde bosque oscuro de la imagen de referencia */
-            overflow-y: auto; /* Fuerza la aparición de la barra para subir y bajar si es necesario */
+            background-color: #0e3d26; 
+            overflow-y: auto; 
         }
 
         /* Sección Superior: Previsualización de la imagen cargada */
@@ -25,14 +24,14 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #0e3d26; /* 1. Tono verde corporativo oscuro */
+            background-color: #0e3d26; 
             position: relative;
             padding: 30px 20px;
             min-height: 55vh;
         }
 
         #image-preview {
-            max-height: 50vh; /* Se redujo ligeramente para que quepa mejor en pantallas estándar */
+            max-height: 50vh; 
             max-width: 100%;
             border-radius: 12px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.6);
@@ -48,11 +47,10 @@
             z-index: 20;
         }
 
-        /* Estilo para el botón de carga basado en la imagen 10273068276740387392.jpeg */
         .custom-file-upload {
             padding: 16px 35px;
             font-size: 1.1rem;
-            background-color: #0d5c36; /* Verde del botón de referencia */
+            background-color: #0d5c36; 
             color: white;
             border: 2px solid #1b7a4b;
             border-radius: 50px;
@@ -90,7 +88,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #446351; /* 1. Verde musgo de la base de la imagen de referencia */
+            background-color: #446351; 
             color: white;
             transition: background-color 0.3s ease;
             box-shadow: 0 -8px 25px rgba(0,0,0,0.4);
@@ -145,7 +143,6 @@
         <div id="percentage-text">Cargue una foto para analizar el estándar</div>
     </div>
 
-    <!-- Librerías de Google Teachable Machine -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
@@ -200,7 +197,7 @@
                 }
             }
 
-            const nombreClase = claseGanadora.className.toLowerCase();
+            const nombreClase = claseGanadora.className.toLowerCase().trim();
             const porcentaje = (claseGanadora.probability * 100).toFixed(0);
 
             const panelSemafoto = document.getElementById("result-section");
@@ -209,26 +206,27 @@
 
             textoPorcentaje.innerText = `Confianza del análisis: ${porcentaje}%`;
 
-            // --- 2 y 3. AJUSTE DE MENSAJES EXACTOS Y TONALIDADES DE VERDE / ROJO ---
-            if (nombreClase.includes("critica") || nombreClase.includes("crítica")) {
-                panelSemafoto.style.backgroundColor = "#dc3545"; // 3. Rojo para Crítica
+            // --- CORRECCIÓN DE DETECCIÓN ULTRA-SEGURA ---
+            if (nombreClase.includes("crit") || nombreClase.includes("crít")) {
+                panelSemafoto.style.backgroundColor = "#dc3545"; // Rojo estricto
                 textoEstatus.innerText = "🚨 RECHAZO: DESVIACIÓN CRÍTICA 🚨";
             } 
             else if (nombreClase.includes("mayor")) {
-                panelSemafoto.style.backgroundColor = "#556b2f"; // 3. Verde Oliva oscuro para Mayor
+                panelSemafoto.style.backgroundColor = "#556b2f"; // Verde Oliva
                 textoEstatus.innerText = "⚠️ ALERTA: DESVIACIÓN MAYOR ⚠️";
             } 
             else if (nombreClase.includes("menor")) {
-                panelSemafoto.style.backgroundColor = "#2e7d32"; // 3. Verde Intermedio para Menor
+                panelSemafoto.style.backgroundColor = "#2e7d32"; // Verde Intermedio
                 textoEstatus.innerText = "🔍 DETALLE: DESVIACIÓN MENOR";
             } 
-            else if (nombreClase.includes("sin") || nombreClase.includes("cumple") || nombreClase.includes("bueno")) {
-                panelSemafoto.style.backgroundColor = "#218838"; // 3. Verde Brillante para Sin Desviación
+            else if (nombreClase.includes("sin") || nombreClase.includes("cumple") || nombreClase.includes("bueno") || nombreClase.includes("ok")) {
+                panelSemafoto.style.backgroundColor = "#218838"; // Verde Aprobado
                 textoEstatus.innerText = "✅ OK: SIN DESVIACIÓN";
             } 
             else {
-                // Respaldo por si el nombre en TM varía un poco
-                panelSemafoto.style.backgroundColor = "#0d5c36"; 
+                // COLOR DE DIAGNÓSTICO: Si el nombre en TM tiene caracteres extraños, 
+                // se pondrá gris para avisarnos que no entró en ninguna regla anterior.
+                panelSemafoto.style.backgroundColor = "#5a6268"; 
                 textoEstatus.innerText = claseGanadora.className.toUpperCase();
             }
         }
