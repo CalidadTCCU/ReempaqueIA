@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Calidad - Estándar Visual</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #111;
+            overflow: hidden;
+        }
+        #camera-section {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            position: relative;
+        }
+        #webcam-container canvas {
+            max-height: 85vh;
+            max-width: 100%;
+            border-radius: 12px;
+            transform: scaleX(-1); /* Efecto espejo para comodidad del operador */
+        }
+        #result-section {
+            height: 35vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #333;
+            color: white;
+            transition: background-color 0.2s ease;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        #status-text {
+            font-size: 3.2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+        #percentage-text {
+            font-size: 1.4rem;
+            margin-top: 10px;
+            opacity: 0.9;
+            font-weight: bold;
+        }
+        #start-btn {
+            position: absolute;
+            padding: 22px 45px;
+            font-size: 1.6rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            z-index: 20;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        #start-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="camera-section">
+        <button id="start-btn" type="button" onclick="init()">INICIAR EVALUACIÓN DE CALIDAD</button>
+        <div id="webcam-container"></div>
+    </div>
+
+    <div id="result-section">
+        <p id="status-text">SISTEMA APAGADO</p>
+        <div id="percentage-text">Presione el botón azul para encender la cámara</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        // Tu modelo enlazado directamente
+        const URL = "https://teachablemachine.withgoogle.com/models/FRvbyoDob/";
+
+        let model, webcam, maxPredictions;
+
+        // Inicializa el modelo y la cámara
+        async function init() {
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('status-text').innerText = "CARGANDO MODELO IA...";
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // Configuración de cámara optimizada para la pantalla
+                const flip = true; 
+                webcam = new tmImage.Webcam(500, 500, flip); 
+                await webcam.setup(); 
+                await webcam.play();
+                
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                window.requestAnimationFrame(loop);
+            } catch (error) {
+                console.error(error);
+                alert("Error al acceder a la cámara. Asegúrate de dar los permisos correspondientes.");
+                document.getElementById('start-btn').style.display = 'block';
+                document.getElementById('status-text').innerText = "SISTEMA APAGADO";
+            }
+        }
+
+        async function loop() {
+            webcam.update(); 
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // Procesa la imagen y cambia la interfaz según el resultado más probable
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            
+            // Algoritmo para encontrar qué categoría tiene el porcentaje más alto en tiempo real
+            let claseGanadora = prediction[0];
+            for (let i = 1; i < maxPredictions; i++) {
+                if (prediction[i].probability > claseGanadora.probability) {
+                    claseGanadora = prediction[i];
+                }
+            }
+
+            const nombreClase = claseGanadora.className.toLowerCase();
+            const porcentaje = (claseGanadora.probability * 100).toFixed(0);
+
+            const panelSemafoto = document.getElementById("result-section");
+            const textoEstatus = document.getElementById("status-text");
+            const textoPorcentaje = document.getElementById("percentage-text");
+
+            textoPorcentaje.innerText = `Precisión del análisis: ${porcentaje}%`;
+
+            // --- LÓGICA DEL SEMÁFORO VISUAL ---
+            if (nombreClase.includes("critico") || nombreClase.includes("crítico")) {
+                panelSemafoto.style.backgroundColor = "#dc3545"; // Rojo
+                textoEstatus.innerText = "🚨 RECHAZO: DEFECTO CRÍTICO 🚨";
+            } 
+            else if (nombreClase.includes("mayor")) {
+                panelSemafoto.style.backgroundColor = "#ff9800"; // Naranja
+                textoEstatus.innerText = "⚠️ ALERTA: DEFECTO MAYOR";
+            } 
+            else if (nombreClase.includes("menor")) {
+                panelSemafoto.style.backgroundColor = "#17a2b8"; // Celeste / Cian
+                textoEstatus.innerText = "🔍 DETALLE: DEFECTO MENOR";
+            } 
+            else if (nombreClase.includes("sin defecto") || nombreClase.includes("cumple") || nombreClase.includes("bueno")) {
+                panelSemafoto.style.backgroundColor = "#28a745"; // Verde brillante
+                textoEstatus.innerText = "✅ PIEZA OK - CUMPLE ESTÁNDAR";
+            } 
+            else {
+                // En caso de que se use otro nombre no registrado
+                panelSemafoto.style.backgroundColor = "#6c757d"; 
+                textoEstatus.innerText = claseGanadora.className.toUpperCase();
+            }
+        }
+    </script>
+</body>
+</html>
