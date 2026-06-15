@@ -11,9 +11,11 @@
             padding: 0;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            background-color: #1a1a1a;
-            overflow: hidden;
+            /* 4. SOLUCIÓN AL ZOOM: Se cambia a min-height y se activa la barra de desplazamiento */
+            min-height: 100vh;
+            height: auto;
+            background-color: #0e3d26; /* 1. Verde bosque oscuro de la imagen de referencia */
+            overflow-y: auto; /* Fuerza la aparición de la barra para subir y bajar si es necesario */
         }
 
         /* Sección Superior: Previsualización de la imagen cargada */
@@ -23,79 +25,88 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #000;
+            background-color: #0e3d26; /* 1. Tono verde corporativo oscuro */
             position: relative;
-            padding: 20px;
+            padding: 30px 20px;
+            min-height: 55vh;
         }
 
         #image-preview {
-            max-height: 70vh;
+            max-height: 50vh; /* Se redujo ligeramente para que quepa mejor en pantallas estándar */
             max-width: 100%;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            display: none; /* Oculto hasta que se cargue una imagen */
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            display: none; 
+            border: 3px solid #446351;
         }
 
-        /* Controles de carga flotantes */
+        /* Controles de carga */
         #controls-container {
-            margin-top: 15px;
+            margin-top: 20px;
             display: flex;
             gap: 10px;
             z-index: 20;
         }
 
-        /* Estilo para el botón visual de carga */
+        /* Estilo para el botón de carga basado en la imagen 10273068276740387392.jpeg */
         .custom-file-upload {
-            padding: 15px 30px;
-            font-size: 1.2rem;
-            background-color: #007bff;
+            padding: 16px 35px;
+            font-size: 1.1rem;
+            background-color: #0d5c36; /* Verde del botón de referencia */
             color: white;
-            border: none;
+            border: 2px solid #1b7a4b;
             border-radius: 50px;
             cursor: pointer;
             font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             transition: background-color 0.2s, transform 0.2s;
+            letter-spacing: 1px;
         }
 
         .custom-file-upload:hover {
-            background-color: #0056b3;
-            transform: scale(1.02);
+            background-color: #11693e;
+            transform: scale(1.03);
         }
 
-        /* Ocultar el input file real que es feo */
         #image-input {
             display: none;
         }
 
         #loading-model-msg {
             color: white;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             position: absolute;
+            font-weight: bold;
+            background-color: rgba(0,0,0,0.4);
+            padding: 10px 20px;
+            border-radius: 8px;
         }
 
         /* Sección Inferior: Panel Semáforo (Resultado) */
         #result-section {
-            height: 30vh;
+            height: 35vh;
+            min-height: 220px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #333;
+            background-color: #446351; /* 1. Verde musgo de la base de la imagen de referencia */
             color: white;
             transition: background-color 0.3s ease;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            box-shadow: 0 -8px 25px rgba(0,0,0,0.4);
             z-index: 10;
-            padding: 10px;
+            padding: 20px;
             text-align: center;
+            box-sizing: border-box;
         }
 
         #status-text {
-            font-size: 2.8rem;
+            font-size: 3rem;
             font-weight: 900;
             text-transform: uppercase;
             margin: 0;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
         }
 
         @media (max-width: 600px) {
@@ -103,17 +114,21 @@
         }
 
         #percentage-text {
-            font-size: 1.2rem;
-            margin-top: 5px;
-            opacity: 0.9;
+            font-size: 1.4rem;
+            margin-top: 10px;
+            opacity: 0.95;
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
         }
     </style>
 </head>
 <body>
 
+    <!-- Zona de Carga -->
     <div id="image-section">
         <div id="loading-model-msg">Cargando modelo de IA...</div>
-        
         <img id="image-preview" src="#" alt="Previsualización" />
 
         <div id="controls-container" style="display: none;">
@@ -124,16 +139,17 @@
         </div>
     </div>
 
+    <!-- Panel Semáforo -->
     <div id="result-section">
         <p id="status-text">ESPERANDO IMAGEN</p>
-        <div id="percentage-text">Cargue una foto para analizar</div>
+        <div id="percentage-text">Cargue una foto para analizar el estándar</div>
     </div>
 
+    <!-- Librerías de Google Teachable Machine -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // Tu modelo enlazado
         const URL = "https://teachablemachine.withgoogle.com/models/FRvbyoDob/";
 
         let model, maxPredictions;
@@ -141,7 +157,6 @@
         const loadingMsg = document.getElementById('loading-model-msg');
         const controlsCont = document.getElementById('controls-container');
 
-        // 1. Cargar el modelo al abrir la página automáticamente
         async function initModel() {
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
@@ -149,46 +164,35 @@
             try {
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
-                
-                // Ocultar mensaje de carga y mostrar botones
                 loadingMsg.style.display = 'none';
                 controlsCont.style.display = 'flex';
             } catch (error) {
                 console.error(error);
                 loadingMsg.innerText = "Error cargando el modelo. Revisa la consola.";
-                loadingMsg.style.color = "red";
+                loadingMsg.style.color = "#dc3545";
             }
         }
 
-        // 2. Función para leer el archivo seleccionado y mostrarlo en pantalla
         function readURL(input) {
             if (input.files && input.files[0]) {
                 var reader = new FileReader();
-
                 reader.onload = function (e) {
-                    // Establecer la imagen cargada como fuente de la previsualización
                     imagePreview.src = e.target.result;
                     imagePreview.style.display = 'block';
-                    
-                    // Esperar un momento a que la imagen se renderice y luego predecir
                     setTimeout(predict, 100); 
                 };
-
                 reader.readAsDataURL(input.files[0]);
             }
         }
 
-        // 3. Procesa la imagen estática cargada
         async function predict() {
             if (!model) return;
 
             document.getElementById("status-text").innerText = "ANALIZANDO...";
-            document.getElementById("result-section").style.backgroundColor = "#333";
+            document.getElementById("result-section").style.backgroundColor = "#446351";
 
-            // Teachable Machine puede predecir directamente desde un elemento <img>
             const prediction = await model.predict(imagePreview);
             
-            // Encontrar la categoría más probable
             let claseGanadora = prediction[0];
             for (let i = 1; i < maxPredictions; i++) {
                 if (prediction[i].probability > claseGanadora.probability) {
@@ -199,38 +203,37 @@
             const nombreClase = claseGanadora.className.toLowerCase();
             const porcentaje = (claseGanadora.probability * 100).toFixed(0);
 
-            // Actualizar la interfaz (Misma lógica de semáforo)
             const panelSemafoto = document.getElementById("result-section");
             const textoEstatus = document.getElementById("status-text");
             const textoPorcentaje = document.getElementById("percentage-text");
 
             textoPorcentaje.innerText = `Confianza del análisis: ${porcentaje}%`;
 
-            if (nombreClase.includes("critico") || nombreClase.includes("crítico")) {
-                panelSemafoto.style.backgroundColor = "#dc3545"; // Rojo
-                textoEstatus.innerText = "🚨 RECHAZO: CRÍTICO 🚨";
+            // --- 2 y 3. AJUSTE DE MENSAJES EXACTOS Y TONALIDADES DE VERDE / ROJO ---
+            if (nombreClase.includes("critica") || nombreClase.includes("crítica")) {
+                panelSemafoto.style.backgroundColor = "#dc3545"; // 3. Rojo para Crítica
+                textoEstatus.innerText = "🚨 RECHAZO: DESVIACIÓN CRÍTICA 🚨";
             } 
             else if (nombreClase.includes("mayor")) {
-                panelSemafoto.style.backgroundColor = "#ff9800"; // Naranja
-                textoEstatus.innerText = "⚠️ ALERTA: MAYOR";
+                panelSemafoto.style.backgroundColor = "#556b2f"; // 3. Verde Oliva oscuro para Mayor
+                textoEstatus.innerText = "⚠️ ALERTA: DESVIACIÓN MAYOR ⚠️";
             } 
             else if (nombreClase.includes("menor")) {
-                panelSemafoto.style.backgroundColor = "#17a2b8"; // Celeste
-                textoEstatus.innerText = "🔍 DETALLE: MENOR";
+                panelSemafoto.style.backgroundColor = "#2e7d32"; // 3. Verde Intermedio para Menor
+                textoEstatus.innerText = "🔍 DETALLE: DESVIACIÓN MENOR";
             } 
-            else if (nombreClase.includes("sin defecto") || nombreClase.includes("cumple") || nombreClase.includes("bueno")) {
-                panelSemafoto.style.backgroundColor = "#28a745"; // Verde
-                textoEstatus.innerText = "✅ PIEZA OK";
+            else if (nombreClase.includes("sin") || nombreClase.includes("cumple") || nombreClase.includes("bueno")) {
+                panelSemafoto.style.backgroundColor = "#218838"; // 3. Verde Brillante para Sin Desviación
+                textoEstatus.innerText = "✅ OK: SIN DESVIACIÓN";
             } 
             else {
-                panelSemafoto.style.backgroundColor = "#6c757d"; 
+                // Respaldo por si el nombre en TM varía un poco
+                panelSemafoto.style.backgroundColor = "#0d5c36"; 
                 textoEstatus.innerText = claseGanadora.className.toUpperCase();
             }
         }
 
-        // Iniciar carga del modelo al cargar la ventana
         window.onload = initModel;
-
     </script>
 </body>
 </html>
